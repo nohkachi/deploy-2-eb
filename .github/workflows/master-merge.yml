@@ -1,0 +1,77 @@
+name: master-CD
+on:
+  push:
+    branches: [ master ]
+
+# define env vars for use by this job
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+jobs:
+  ci:
+    runs-on: ubuntu-18.04
+    #container:
+      #image: node:12.18.3-lts
+
+    steps:
+
+    # checkout codebase    
+    - uses: actions/checkout@v2
+      with:
+        ref: master      
+
+    # install
+    - name: npm install
+      uses: actions/npm@master
+      with:
+        args: install
+
+    # test
+    - name: npm test
+      uses: actions/npm@master
+      with:
+        args: run test
+
+  cd:
+    runs-on: ubuntu-18.04
+    needs: ci
+
+    steps:
+
+    # build the container
+    - name: docker build
+      uses: actions/docker/cli@master
+      with:
+        args: build -t oakinogundeji/dep-2-elb .
+    
+    # login to docker hub
+    - name: docker login
+      uses: actions/docker/login@master
+      env:
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
+    # push image to docker hub
+    - name: docker push
+      uses: actions/docker/cli@master
+      with:
+        args: push oakinogundeji/dep-2-elb
+
+    # install eb cli
+    - name: install eb cli
+      run: |
+        sudo apt-get install build-essential zlib1g-dev libssl-dev libncurses-dev libffi-dev libsqlite3-dev libreadline-dev libbz2-dev
+        git clone https://github.com/aws/aws-elastic-beanstalk-cli-setup.git
+        ./aws-elastic-beanstalk-cli-setup/scripts/bundled_installer
+
+    # prep to deploy to eos_bannereb
+    - name: prep to push to eb
+      run: eb init -p docker dep-2-elb
+
+    # create and deploy to eb
+    - name: deploy to eb
+      run: eb create dep2elbenv
+
+
