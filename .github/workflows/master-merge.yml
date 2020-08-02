@@ -24,15 +24,8 @@ jobs:
 
     # install
     - name: npm install
-      uses: actions/npm@master
-      with:
-        args: install
-
-    # test
-    - name: npm test
-      uses: actions/npm@master
-      with:
-        args: run test
+      run: |
+        npm ci --only=production
 
   cd:
     runs-on: ubuntu-18.04
